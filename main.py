@@ -3,6 +3,7 @@ from pydub import AudioSegment
 import matplotlib.pyplot as plt
 import tkinter as tk
 from tkinter import filedialog
+from matplotlib.ticker import MaxNLocator
 
 def decode_audio(file_path):
     audio = AudioSegment.from_file(file_path)
@@ -15,12 +16,13 @@ def plot_spectrum(samples, sample_rate):
     if len(samples.shape) == 2:
         samples = samples.mean(axis=1)
     
+    # This code was commented to fix the dB scale issue.
     # n = len(samples)
     # duration = n / sample_rate
     # time = np.linspace(0., duration, n)
-    
     # plt.specgram(samples, NFFT=2048, Fs=sample_rate, noverlap=1024, cmap='inferno')
 
+    # This code was added to fix the dB Scale issue.
     plt.figure(figsize=(10, 6))
     Pxx, freqs, bins, im = plt.specgram(samples, NFFT=2048, Fs=sample_rate, noverlap=1024, cmap='inferno', vmin=-120, vmax=0)
 
@@ -28,7 +30,36 @@ def plot_spectrum(samples, sample_rate):
     plt.ylabel('Frequency (Hz)')
     plt.colorbar(label='Intensity (dB)')
     plt.title('Spectrogram')
+
+    # Adjust x-axis to show markers every 15 seconds
+    plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))
+    plt.xticks(np.arange(0, bins[-1], step=15))
+
     plt.show()
+
+    return freqs, Pxx
+
+def determine_cutoff(freqs, Pxx):
+    avg_intensity = np.mean(Pxx, axis=1)
+    threshold_db = -60  # Threshold in dB to determine significant energy
+    cutoff_index = np.where(avg_intensity > 10**(threshold_db / 10))[0]
+    
+    if cutoff_index.size == 0:
+        return 0  # No significant energy found
+    cutoff_freq = freqs[cutoff_index[-1]]
+    return cutoff_freq  
+
+def determine_dominant_frequency_band(freqs, Pxx, bands):
+    avg_intensity = np.mean(Pxx, axis=1)
+    band_energy = np.zeros(len(bands) - 1)
+    
+    for i in range(len(bands) - 1):
+        band_indices = np.where((freqs >= bands[i]) & (freqs < bands[i + 1]))[0]
+        band_energy[i] = np.sum(avg_intensity[band_indices])
+    
+    dominant_band_index = np.argmax(band_energy)
+    dominant_band = (bands[dominant_band_index], bands[dominant_band_index + 1])
+    return dominant_band
 
 def run_spek():
     root = tk.Tk()
@@ -37,7 +68,14 @@ def run_spek():
     
     if file_path:
         samples, sample_rate = decode_audio(file_path)
-        plot_spectrum(samples, sample_rate)
+        freqs, Pxx = plot_spectrum(samples, sample_rate)
+        cutoff_freq = determine_cutoff(freqs, Pxx)
+        print(f"Cutoff Frequency: {cutoff_freq} Hz")
+
+        # Define frequency bands (in Hz)
+        bands = [8000, 10000, 12000, 14000, 16000, 18000, 20000]
+        dominant_band = determine_dominant_frequency_band(freqs, Pxx, bands)
+        print(f"Dominant Frequency Band: {dominant_band[0]} Hz - {dominant_band[1]} Hz")
     else:
         print("No file selected")
 
