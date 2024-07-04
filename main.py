@@ -39,6 +39,24 @@ def plot_spectrum(samples, sample_rate):
 
     return freqs, Pxx
 
+def plot_spectrum_multiple(samples, sample_rate, title):
+    if len(samples.shape) == 2:
+        samples = samples.mean(axis=1)
+    
+    plt.figure(figsize=(10, 6))
+    Pxx, freqs, bins, im = plt.specgram(samples, NFFT=2048, Fs=sample_rate, noverlap=1024, cmap='inferno', vmin=-120, vmax=0)
+    
+    plt.xlabel('Time (s)')
+    plt.ylabel('Frequency (Hz)')
+    plt.colorbar(label='Intensity (dB)')
+    plt.title(title)
+    
+    plt.gca().xaxis.set_major_locator(plt.MaxNLocator(integer=True, prune='both'))
+    plt.xticks(np.arange(0, bins[-1], step=15))
+
+    return freqs, Pxx
+
+
 def determine_cutoff(freqs, Pxx):
     avg_intensity = np.mean(Pxx, axis=1)
     threshold_db = -60  # Threshold in dB to determine significant energy
@@ -61,6 +79,51 @@ def determine_dominant_frequency_band(freqs, Pxx, bands):
     dominant_band = (bands[dominant_band_index], bands[dominant_band_index + 1])
     return dominant_band
 
+def run_spek_multiple_v2():
+    root = tk.Tk()
+    root.withdraw()
+    file_paths = filedialog.askopenfilenames(title="Select Audio Files", filetypes=[("Audio Files", "*.mp3 *.wav *.flac *.m4a"),("All Files", "*.*")])
+    
+    if file_paths:
+        for file_path in file_paths:
+            print(f"Processing file: {file_path}")
+            samples, sample_rate = decode_audio(file_path)
+            title = f"{file_path.split('/')[-1]}"
+            freqs, Pxx = plot_spectrum_multiple(samples, sample_rate, title)
+            cutoff_freq = determine_cutoff(freqs, Pxx)
+            print(f"Cutoff Frequency: {cutoff_freq} Hz")
+            
+            # Define frequency bands (in Hz)
+            bands = [0, 250, 500, 1000, 2000, 4000, 8000, 16000, 20000]
+            dominant_band = determine_dominant_frequency_band(freqs, Pxx, bands)
+            print(f"Dominant Frequency Band: {dominant_band[0]} Hz - {dominant_band[1]} Hz")
+        
+        plt.show()  # Show all plots at once
+    else:
+        print("No file selected")
+
+
+def run_spek_multiple():
+    root = tk.Tk()
+    root.withdraw()
+    file_paths = filedialog.askopenfilenames(title="Select Audio Files", filetypes=[("Audio Files", "*.mp3 *.wav *.flac *.m4a"),("All Files", "*.*")])
+    
+    if file_paths:
+        for file_path in file_paths:
+            print(f"Processing file: {file_path}")
+            samples, sample_rate = decode_audio(file_path)
+            freqs, Pxx = plot_spectrum(samples, sample_rate)
+            cutoff_freq = determine_cutoff(freqs, Pxx)
+            print(f"Cutoff Frequency: {cutoff_freq} Hz")
+            
+            # Define frequency bands (in Hz)
+            bands = [0, 250, 500, 1000, 2000, 4000, 8000, 16000, 20000]
+            dominant_band = determine_dominant_frequency_band(freqs, Pxx, bands)
+            print(f"Dominant Frequency Band: {dominant_band[0]} Hz - {dominant_band[1]} Hz")
+    else:
+        print("No file selected")
+
+
 def run_spek():
     root = tk.Tk()
     root.withdraw()
@@ -79,5 +142,7 @@ def run_spek():
     else:
         print("No file selected")
 
+
+
 if __name__ == "__main__":
-    run_spek()
+    run_spek_multiple_v2()
